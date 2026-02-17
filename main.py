@@ -1,10 +1,11 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
-import models, database
+import models, database, os
 
 models.Base.metadata.create_all(bind=database.engine)
 
@@ -14,9 +15,15 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/")
+def root():
+    return FileResponse("static/index.html")
 
 class PartItem(BaseModel):
     name: str
@@ -49,14 +56,9 @@ class RecordSchema(BaseModel):
     class Config:
         from_attributes = True
 
-@app.get("/")
-def root():
-    return {"message": "정비 기록부 서버 작동중 🔧"}
-
 @app.get("/records")
 def get_records(db: Session = Depends(database.get_db)):
-    records = db.query(models.Record).order_by(models.Record.created_at.desc()).all()
-    return records
+    return db.query(models.Record).order_by(models.Record.created_at.desc()).all()
 
 @app.post("/records")
 def create_record(record: RecordSchema, db: Session = Depends(database.get_db)):
